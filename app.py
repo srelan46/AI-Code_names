@@ -1,14 +1,11 @@
 from GameGUI import GameGUI
 from Game import Game
 from Card import cardType
+from utils import read_words_from_file
 
 if __name__ == "__main__":
     # Sample list of 25+ words
-    words = [
-        "apple", "orange", "banana", "kiwi", "lemon", "grape", "peach", "berry", "melon", 
-        "cherry", "plum", "pear", "mango", "papaya", "pineapple", "coconut", "lime", "apricot",
-        "fig", "guava", "date", "nectarine", "passionfruit", "pomegranate", "dragonfruit"
-    ]
+    words = read_words_from_file("words.txt")
 
     game = Game(words)
     # Before the game starts, print the red and blue words (spymaster view)
