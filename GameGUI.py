@@ -1,11 +1,9 @@
 import pygame
-import random
-from enum import Enum
-from Card import Card, cardType
+from Card import cardType
 from Game import Game
 
 class GameGUI:
-    def __init__(self, game: Game, screen_width=800, screen_height=900):
+    def __init__(self, game: Game, screen_width=1920, screen_height=1080):
         self.game = game
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -13,11 +11,11 @@ class GameGUI:
         self.cols = 5
         self.margin = 5
         # Calculate card dimensions for a grid layout
-        self.card_width = (self.screen_width - (self.cols + 1) * self.margin) // self.cols
-        self.card_height = (self.screen_width - (self.rows + 1) * self.margin) // self.rows
+        self.card_width = (self.screen_width/1.5 - (self.cols + 1) * self.margin) // (self.cols +1)
+        self.card_height = (self.screen_height/1.5 - (self.rows + 1) * self.margin) // self.rows
 
         pygame.init()
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
         pygame.display.set_caption("CodeNames GUI")
         self.font = pygame.font.SysFont("Arial", 18)
         self.running = True
@@ -25,35 +23,25 @@ class GameGUI:
         self.mode = "clue"
         self.input_text = ""
     
-    def validate_clue(self, clue_str: str) -> bool:
-        """
-        Validates that the clue is in the format "word:number", that the word has no spaces,
-        and that the clue word is not one of the unrevealed codenames on the board.
-        """
-        if ":" not in clue_str:
-            print("Clue must contain a colon separating the word and the number (e.g., tree:2).")
-            return False
-        parts = clue_str.split(":", 1)
-        clue_word = parts[0].strip()
-        clue_number = parts[1].strip()
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.VIDEORESIZE:
+                self.screen_width, self.screen_height = event.w, event.h
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.RESIZABLE)
+                # Recalculate card dimensions
+                self.card_width = (self.screen_width/1.5 - (self.cols + 1) * self.margin) // (self.cols + 1)
+                self.card_height = (self.screen_height/1.5 - (self.rows + 1) * self.margin) // self.rows
+            elif self.mode == "clue" and event.type == pygame.KEYDOWN:
+                self.process_clue_input(event)
+            elif self.mode == "guess" and event.type == pygame.MOUSEBUTTONDOWN:
+                self.process_card_click()
 
-        # Check that the clue word is a single word (no spaces)
-        if " " in clue_word or not clue_word:
-            print("Clue must be a single word with no spaces.")
-            return False
-
-        # Ensure the clue word is not among the unrevealed card words (case-insensitive)
-        for card in self.game.board.cards:
-            if not card.revealed and card.word.lower() == clue_word.lower():
-                print(f"Clue word '{clue_word}' cannot be one of the unrevealed codenames.")
-                return False
-
-        # Validate the number is a digit
-        if not clue_number.isdigit():
-            print("The number part of the clue must be an integer.")
-            return False
-
-        return True
+    def switch_turn_and_reset(self):
+        self.game.switch_turn()
+        self.mode = "clue"
+        self.input_text = ""
 
     def draw_board(self):
         # Fill background
@@ -125,74 +113,74 @@ class GameGUI:
                 return card
         return None
 
+    def process_clue_input(self, event):
+        if event.key == pygame.K_RETURN:
+            # When Enter is pressed, validate and set the clue.
+            if self.game.validate_clue(self.input_text):
+                self.game.current_clue = self.input_text.strip()
+                try:
+                    parts = self.input_text.split(":", 1)
+                    self.game.allowed_guesses = int(parts[1].strip())
+                except Exception as e:
+                    print("Error parsing allowed guesses:", e)
+                    self.game.allowed_guesses = 0
+                self.game.current_guess_count = 0
+                print(f"Clue accepted: {self.game.current_clue}, allowed guesses: {self.game.allowed_guesses}")
+                self.mode = "guess"
+                self.input_text = ""
+            else:
+                print("Invalid clue. Please try again.")
+                self.input_text = ""  # Clear the input text to re-enter the clue
+        elif event.key == pygame.K_BACKSPACE:
+            self.input_text = self.input_text[:-1]
+        else:
+            self.input_text += event.unicode
+        
+    def process_card_click(self):
+        pos = pygame.mouse.get_pos()
+        clicked_card = self.get_card_at_position(pos)
+        if clicked_card and not clicked_card.revealed:
+            clicked_card.reveal()
+            print(f"Revealed card: {clicked_card.word} ({clicked_card.card_type.value})")
+            if clicked_card.card_type == cardType.ASSASSIN:
+                print("Assassin card revealed! Game over!")
+                self.running = False
+            elif clicked_card.card_type == cardType.NEUTRAL:
+                print("Neutral card revealed. Switching turn.")
+                self.switch_turn_and_reset()
+            elif clicked_card.card_type.value != self.game.current_team:
+                print(f"{clicked_card.card_type.value.capitalize()} card revealed. Wrong guess!")
+                if self.game.current_team == "red":
+                    self.game.blue_score += 1
+                else:
+                    self.game.red_score += 1
+                self.switch_turn_and_reset()
+            else:
+                # Correct guess: increment the guess count and update score.
+                self.game.current_guess_count += 1
+                if self.game.current_team == "red":
+                    self.game.red_score += 1
+                else:
+                    self.game.blue_score += 1
+                print(f"Correct guess! {self.game.current_team.capitalize()} score updated.")
+                # Check win conditions.
+                if self.game.red_score >= 9:
+                    print("Red team wins!")
+                    self.running = False
+                elif self.game.blue_score >= 8:
+                    print("Blue team wins!")
+                    self.running = False
+                # If the allowed guesses have been reached, switch turn.
+                elif self.game.current_guess_count >= self.game.allowed_guesses:
+                    print("Allowed guesses reached. Switching turn.")
+                    self.switch_turn_and_reset()
+
     def run(self):
         clock = pygame.time.Clock()
         while self.running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-
-                # Clue mode: capture keyboard input for the spymaster's clue.
-                elif self.mode == "clue" and event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        # When Enter is pressed, validate and set the clue.
-                        if self.validate_clue(self.input_text):
-                            self.game.current_clue = self.input_text.strip()
-                            try:
-                                parts = self.input_text.split(":", 1)
-                                self.game.allowed_guesses = int(parts[1].strip())
-                            except Exception as e:
-                                print("Error parsing allowed guesses:", e)
-                                self.game.allowed_guesses = 0
-                            self.game.current_guess_count = 0
-                            print(f"Clue accepted: {self.game.current_clue}, allowed guesses: {self.game.allowed_guesses}")
-                            self.mode = "guess"
-                            self.input_text = ""
-                        else:
-                            print("Invalid clue. Please try again.")
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.input_text = self.input_text[:-1]
-                    else:
-                        self.input_text += event.unicode
-
-                # Guess mode: allow operative to click on cards.
-                elif self.mode == "guess" and event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
-                    clicked_card = self.get_card_at_position(pos)
-                    if clicked_card and not clicked_card.revealed:
-                        clicked_card.reveal()
-                        print(f"Revealed card: {clicked_card.word} ({clicked_card.card_type.value})")
-                        if clicked_card.card_type == cardType.ASSASSIN:
-                            print("Assassin card revealed! Game over!")
-                            self.running = False
-                        elif clicked_card.card_type.value != self.game.current_team:
-                            print(f"{clicked_card.card_type.value.capitalize()} card revealed. Wrong guess!")
-                            self.game.switch_turn()
-                            self.mode = "clue"
-                            self.input_text = ""
-                        else:
-                            # Correct guess: increment the guess count and update score.
-                            self.game.current_guess_count += 1
-                            if self.game.current_team == "red":
-                                self.game.red_score += 1
-                            else:
-                                self.game.blue_score += 1
-                            print(f"Correct guess! {self.game.current_team.capitalize()} score updated.")
-                            # Check win conditions.
-                            if self.game.red_score >= 9:
-                                print("Red team wins!")
-                                self.running = False
-                            elif self.game.blue_score >= 8:
-                                print("Blue team wins!")
-                                self.running = False
-                            # If the allowed guesses have been reached, switch turn.
-                            elif self.game.current_guess_count >= self.game.allowed_guesses:
-                                print("Allowed guesses reached. Switching turn.")
-                                self.game.switch_turn()
-                                self.mode = "clue"
-                                self.input_text = ""
+            self.handle_events()
             self.draw_board()
             pygame.display.flip()
-            clock.tick(60) 
+            clock.tick(60)
 
         pygame.quit()
