@@ -36,7 +36,9 @@ class GameGUI:
             elif self.mode == "clue" and event.type == pygame.KEYDOWN:
                 self.process_clue_input(event)
             elif self.mode == "guess" and event.type == pygame.MOUSEBUTTONDOWN:
-                self.process_card_click()
+                self.process_card(pos=pygame.mouse.get_pos())
+            elif self.mode == "guess" and event.type == pygame.KEYDOWN:
+                self.process_card(key=event.unicode)
 
     def switch_turn_and_reset(self):
         self.game.switch_turn()
@@ -99,6 +101,11 @@ class GameGUI:
             text_rect = text_surface.get_rect(center=rect.center)
             self.screen.blit(text_surface, text_rect)
 
+            # Render the card's number in the top right corner.
+            number_surface = self.font.render(chr(idx + 97), True, (255, 255, 255))
+            number_rect = number_surface.get_rect(topright=(rect.right - 5, rect.top + 5))
+            self.screen.blit(number_surface, number_rect)
+
     def get_card_at_position(self, pos):
         """Return the card at the given mouse position, or None if no card was clicked."""
         x, y = pos
@@ -136,9 +143,18 @@ class GameGUI:
         else:
             self.input_text += event.unicode
         
-    def process_card_click(self):
-        pos = pygame.mouse.get_pos()
-        clicked_card = self.get_card_at_position(pos)
+    def process_card(self, pos=None, key=None):
+        if pos:
+            clicked_card = self.get_card_at_position(pos)
+        elif key and key.isalpha():
+            idx = ord(key.lower()) - 97
+            if 0 <= idx < len(self.game.board.cards):
+                clicked_card = self.game.board.cards[idx]
+            else:
+                clicked_card = None
+        else:
+            clicked_card = None
+
         if clicked_card and not clicked_card.revealed:
             clicked_card.reveal()
             print(f"Revealed card: {clicked_card.word} ({clicked_card.card_type.value})")
