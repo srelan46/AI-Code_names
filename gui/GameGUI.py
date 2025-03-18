@@ -55,20 +55,6 @@ class GameGUI:
         """Delegate board drawing to renderer"""
         self.renderer.draw_board()
 
-    def get_card_at_position(self, pos):
-        """Return the card at the given mouse position, or None if no card was clicked."""
-        x, y = pos
-        # Adjust for the top banner area (140 pixels)
-        for idx, card in enumerate(self.game.board.cards):
-            row = idx // COLS
-            col = idx % COLS
-            card_x = MARGIN + col * (self.card_width + MARGIN)
-            card_y = MARGIN + row * (self.card_height + MARGIN) + 140
-            rect = pygame.Rect(card_x, card_y, self.card_width, self.card_height)
-            if rect.collidepoint(x, y):
-                return card
-        return None
-
     def run(self):
         clock = pygame.time.Clock()
         while self.running:
