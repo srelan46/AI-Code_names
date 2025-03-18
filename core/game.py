@@ -1,5 +1,5 @@
-from Board import Board
-from Player import Player
+from core.board import Board
+from core.Player import Player
 
 class Game:
     def __init__(self, words: list):

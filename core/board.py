@@ -1,4 +1,4 @@
-from Card import Card, cardType
+from core.card import Card, cardType
 import random
 class Board:
     def __init__(self, words: list):
